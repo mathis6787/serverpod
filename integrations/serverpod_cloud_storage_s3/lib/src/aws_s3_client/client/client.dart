@@ -17,6 +17,7 @@ class AwsS3Client {
   final String _bucketId;
   final String? _sessionToken;
   final Client _client;
+  final bool _useHttps;
 
   static const _service = "s3";
 
@@ -29,21 +30,23 @@ class AwsS3Client {
   /// @param region The region of the bucket. Required.
   /// @param sessionToken The session token. Optional.
   /// @param client The http client. Optional. Useful for debugging.
-  AwsS3Client({
-    required String secretKey,
-    required String accessKey,
-    required String bucketId,
-    String? host,
-    required String region,
-    String? sessionToken,
-    Client? client,
-  }) : _accessKey = accessKey,
-       _secretKey = secretKey,
-       _host = host ?? "s3.$region.amazonaws.com",
-       _bucketId = bucketId,
-       _region = region,
-       _sessionToken = sessionToken,
-       _client = client ?? Client();
+  AwsS3Client(
+      {required String secretKey,
+      required String accessKey,
+      required String bucketId,
+      String? host,
+      bool useHttps = true,
+      required String region,
+      String? sessionToken,
+      Client? client})
+      : _accessKey = accessKey,
+        _secretKey = secretKey,
+        _host = host ?? "s3.$region.amazonaws.com",
+        _bucketId = bucketId,
+        _region = region,
+        _sessionToken = sessionToken,
+        _useHttps = useHttps,
+        _client = client ?? Client();
 
   Future<ListBucketResult?> listObjects({
     String? prefix,
@@ -89,7 +92,9 @@ class AwsS3Client {
     String method = 'GET',
   }) {
     final unencodedPath = "$_bucketId/$key";
-    final uri = Uri.https(_host, unencodedPath, queryParams);
+    final uri = _useHttps
+        ? Uri.https(_host, unencodedPath, queryParams)
+        : Uri.http(_host, unencodedPath, queryParams);
     final payload = SigV4.hashCanonicalRequest('');
     final datetime = SigV4.generateDatetime();
     final credentialScope = SigV4.buildCredentialScope(
