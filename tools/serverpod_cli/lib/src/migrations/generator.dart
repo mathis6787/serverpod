@@ -53,6 +53,10 @@ class MigrationGenerator {
     required bool force,
     required GeneratorConfig config,
     bool write = true,
+    String? preDatabaseSetupSql,
+    String? postDatabaseSetupSql,
+    String? preMigrationSql,
+    String? postMigrationSql,
   }) async {
     var migrationRegistry = MigrationRegistry.load(
       MigrationConstants.migrationsBaseDirectory(directory),
@@ -80,10 +84,13 @@ class MigrationGenerator {
       config.modulesAll,
     );
 
-    var databaseDefinitions = await _loadModuleDatabaseDefinitions(
+    var moduleMigrationVersions = await _loadMigrationVersionsFromModules(
       config.modulesDependent,
-      directory,
+      directory: directory,
     );
+
+    var databaseDefinitions =
+        moduleMigrationVersions.map((e) => e.databaseDefinitionProject);
 
     var versionName = createVersionName(tag);
     var nextMigrationVersion = DatabaseMigrationVersion(
@@ -135,23 +142,17 @@ class MigrationGenerator {
       await migrationVersion.write(
         installedModules: databaseDefinitionNext.installedModules,
         removedModules: removedModules,
+        moduleMigrations: moduleMigrationVersions,
+        preDatabaseSetupSql: preDatabaseSetupSql,
+        postDatabaseSetupSql: postDatabaseSetupSql,
+        preMigrationSql: preMigrationSql,
+        postMigrationSql: postMigrationSql,
       );
       migrationRegistry.add(versionName);
       await migrationRegistry.write();
     }
 
     return migrationVersion;
-  }
-
-  Future<Iterable<DatabaseDefinition>> _loadModuleDatabaseDefinitions(
-    List<ModuleConfig> modules,
-    Directory projectFolder,
-  ) async {
-    var versions = await _loadMigrationVersionsFromModules(
-      modules,
-      directory: projectFolder,
-    );
-    return versions.map((e) => e.databaseDefinitionProject);
   }
 
   /// Creates a repair migration that will bring the database up to date with
@@ -430,6 +431,10 @@ class MigrationVersion {
     required this.migration,
     required this.databaseDefinitionProject,
     required this.databaseDefinitionFull,
+    this.preDatabaseSetupSql = '',
+    this.postDatabaseSetupSql = '',
+    this.preMigrationSql = '',
+    this.postMigrationSql = '',
   });
 
   final Directory projectDirectory;
@@ -439,6 +444,10 @@ class MigrationVersion {
   final DatabaseMigration migration;
   final DatabaseDefinition databaseDefinitionProject;
   final DatabaseDefinition databaseDefinitionFull;
+  final String preDatabaseSetupSql;
+  final String postDatabaseSetupSql;
+  final String preMigrationSql;
+  final String postMigrationSql;
 
   static Future<MigrationVersion> load({
     required String moduleName,
@@ -489,6 +498,30 @@ class MigrationVersion {
         migration: migrationDefinition,
         databaseDefinitionProject: databaseDefinitionProject,
         databaseDefinitionFull: databaseDefinition,
+        preDatabaseSetupSql: _readHookSql(
+          MigrationConstants.preDatabaseSetupSQLPath(
+            projectDirectory,
+            versionName,
+          ),
+        ),
+        postDatabaseSetupSql: _readHookSql(
+          MigrationConstants.postDatabaseSetupSQLPath(
+            projectDirectory,
+            versionName,
+          ),
+        ),
+        preMigrationSql: _readHookSql(
+          MigrationConstants.preMigrationSQLPath(
+            projectDirectory,
+            versionName,
+          ),
+        ),
+        postMigrationSql: _readHookSql(
+          MigrationConstants.postMigrationSQLPath(
+            projectDirectory,
+            versionName,
+          ),
+        ),
       );
     } catch (e) {
       throw MigrationVersionLoadException(
@@ -510,9 +543,29 @@ class MigrationVersion {
     return content;
   }
 
+  static String _readHookSql(File file) {
+    if (!file.existsSync()) return '';
+    return file.readAsStringSync();
+  }
+
+  Future<void> _writeHookSql(File file, String? sql) async {
+    if (sql == null) return;
+    file.parent.createSync(recursive: true);
+    await file.writeAsString(sql);
+
+    if (sql.trim().isEmpty) {
+      log.warning('Hook file ${file.path} is empty.');
+    }
+  }
+
   Future<void> write({
     required List<DatabaseMigrationVersion> installedModules,
     required List<DatabaseMigrationVersion> removedModules,
+    List<MigrationVersion> moduleMigrations = const [],
+    String? preDatabaseSetupSql,
+    String? postDatabaseSetupSql,
+    String? preMigrationSql,
+    String? postMigrationSql,
   }) async {
     var migrationDirectory = MigrationConstants.migrationVersionDirectory(
       projectDirectory,
@@ -526,14 +579,49 @@ class MigrationVersion {
     }
     await migrationDirectory.create(recursive: true);
 
-    // Create sql for definition and migration
+    var modulePreDatabaseHooks = moduleMigrations
+        .map((m) => m.preDatabaseSetupSql)
+        .where((sql) => sql.trim().isNotEmpty)
+        .toList();
+    var modulePostDatabaseHooks = moduleMigrations
+        .map((m) => m.postDatabaseSetupSql)
+        .where((sql) => sql.trim().isNotEmpty)
+        .toList();
+
     var definitionSql = databaseDefinitionFull.toPgSql(
       installedModules: installedModules,
+      preSql: [
+        ...modulePreDatabaseHooks,
+        if (preDatabaseSetupSql?.trim().isNotEmpty ?? false)
+          preDatabaseSetupSql!,
+      ],
+      postSql: [
+        ...modulePostDatabaseHooks,
+        if (postDatabaseSetupSql?.trim().isNotEmpty ?? false)
+          postDatabaseSetupSql!,
+      ],
     );
+
+    var modulePreMigrationHooks = moduleMigrations
+        .map((m) => m.preMigrationSql)
+        .where((sql) => sql.trim().isNotEmpty)
+        .toList();
+    var modulePostMigrationHooks = moduleMigrations
+        .map((m) => m.postMigrationSql)
+        .where((sql) => sql.trim().isNotEmpty)
+        .toList();
 
     var migrationSql = migration.toPgSql(
       installedModules: installedModules,
       removedModules: removedModules,
+      preSql: [
+        ...modulePreMigrationHooks,
+        if (preMigrationSql?.trim().isNotEmpty ?? false) preMigrationSql!,
+      ],
+      postSql: [
+        ...modulePostMigrationHooks,
+        if (postMigrationSql?.trim().isNotEmpty ?? false) postMigrationSql!,
+      ],
     );
 
     // Write the database definition JSON file
@@ -565,6 +653,22 @@ class MigrationVersion {
     );
     await definitionSqlFile.writeAsString(definitionSql);
 
+    await _writeHookSql(
+      MigrationConstants.preDatabaseSetupSQLPath(
+        projectDirectory,
+        versionName,
+      ),
+      preDatabaseSetupSql,
+    );
+
+    await _writeHookSql(
+      MigrationConstants.postDatabaseSetupSQLPath(
+        projectDirectory,
+        versionName,
+      ),
+      postDatabaseSetupSql,
+    );
+
     // Write the migration definition JSON file
     var migrationFile = MigrationConstants.databaseMigrationJSONPath(
       projectDirectory,
@@ -582,5 +686,21 @@ class MigrationVersion {
       versionName,
     );
     await migrationSqlFile.writeAsString(migrationSql);
+
+    await _writeHookSql(
+      MigrationConstants.preMigrationSQLPath(
+        projectDirectory,
+        versionName,
+      ),
+      preMigrationSql,
+    );
+
+    await _writeHookSql(
+      MigrationConstants.postMigrationSQLPath(
+        projectDirectory,
+        versionName,
+      ),
+      postMigrationSql,
+    );
   }
 }

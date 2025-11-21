@@ -208,7 +208,11 @@ extension TableDefinitionExtension on TableDefinition {
 // SQL generation
 //
 extension DatabaseDefinitionPgSqlGeneration on DatabaseDefinition {
-  String toPgSql({required List<DatabaseMigrationVersion> installedModules}) {
+  String toPgSql({
+    required List<DatabaseMigrationVersion> installedModules,
+    List<String> preSql = const [],
+    List<String> postSql = const [],
+  }) {
     String out = '';
 
     var tableCreation = '';
@@ -229,6 +233,11 @@ extension DatabaseDefinitionPgSqlGeneration on DatabaseDefinition {
     // Start transaction
     out += 'BEGIN;\n';
     out += '\n';
+
+    if (preSql.isNotEmpty) {
+      out += preSql.where((sql) => sql.trim().isNotEmpty).join('\n');
+      out += '\n\n';
+    }
 
     // Must be declared before any table creation.
     if (tables.any((t) => t.columns.any((c) => c.isVectorColumn))) {
@@ -262,6 +271,12 @@ extension DatabaseDefinitionPgSqlGeneration on DatabaseDefinition {
     }
 
     out += '\n';
+
+    if (postSql.isNotEmpty) {
+      out += postSql.where((sql) => sql.trim().isNotEmpty).join('\n');
+      out += '\n';
+    }
+
     out += 'COMMIT;\n';
 
     return out;
@@ -494,12 +509,19 @@ extension DatabaseMigrationPgSqlGenerator on DatabaseMigration {
   String toPgSql({
     required List<DatabaseMigrationVersion> installedModules,
     required List<DatabaseMigrationVersion> removedModules,
+    List<String> preSql = const [],
+    List<String> postSql = const [],
   }) {
     var out = '';
 
     // Start transaction
     out += 'BEGIN;\n';
     out += '\n';
+
+    if (preSql.isNotEmpty) {
+      out += preSql.where((sql) => sql.trim().isNotEmpty).join('\n');
+      out += '\n\n';
+    }
 
     // Must be declared before any table creation.
     if (actions.any((e) =>
@@ -549,6 +571,11 @@ extension DatabaseMigrationPgSqlGenerator on DatabaseMigration {
     if (removedModules.isNotEmpty) {
       out += '\n';
       out += _sqlRemoveMigrationVersion(removedModules);
+    }
+
+    if (postSql.isNotEmpty) {
+      out += '\n';
+      out += postSql.where((sql) => sql.trim().isNotEmpty).join('\n');
     }
 
     out += '\n';

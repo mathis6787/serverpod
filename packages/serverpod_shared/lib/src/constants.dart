@@ -42,6 +42,26 @@ abstract class MigrationConstants {
         'definition.sql',
       ));
 
+  /// File path where the pre database setup hooks are stored.
+  static File preDatabaseSetupSQLPath(
+    Directory serverRootDirectory,
+    String version,
+  ) =>
+      File(path.join(
+        migrationVersionDirectory(serverRootDirectory, version).path,
+        'pre_database_setup.sql',
+      ));
+
+  /// File path where the post database setup hooks are stored.
+  static File postDatabaseSetupSQLPath(
+    Directory serverRootDirectory,
+    String version,
+  ) =>
+      File(path.join(
+        migrationVersionDirectory(serverRootDirectory, version).path,
+        'post_database_setup.sql',
+      ));
+
   /// File path where the database definition is stored.
   static File databaseDefinitionJSONPath(
     Directory serverRootDirectory,
@@ -70,6 +90,26 @@ abstract class MigrationConstants {
       File(path.join(
         migrationVersionDirectory(serverRootDirectory, version).path,
         'migration.sql',
+      ));
+
+  /// File path where the pre migration hooks are stored.
+  static File preMigrationSQLPath(
+    Directory serverRootDirectory,
+    String version,
+  ) =>
+      File(path.join(
+        migrationVersionDirectory(serverRootDirectory, version).path,
+        'pre_migration.sql',
+      ));
+
+  /// File path where the post migration hooks are stored.
+  static File postMigrationSQLPath(
+    Directory serverRootDirectory,
+    String version,
+  ) =>
+      File(path.join(
+        migrationVersionDirectory(serverRootDirectory, version).path,
+        'post_migration.sql',
       ));
 
   /// File path where the database migration is stored.

@@ -11,6 +11,10 @@ class MigrationVersionBuilder {
     warnings: [],
     migrationApiVersion: 0,
   );
+  String _preDatabaseSetupSql = '';
+  String _postDatabaseSetupSql = '';
+  String _preMigrationSql = '';
+  String _postMigrationSql = '';
   late DatabaseDefinition _databaseDefinition;
   late DatabaseDefinition _databaseDefinitionFull;
   Directory _projectDirectory = Directory.current;
@@ -72,6 +76,26 @@ class MigrationVersionBuilder {
     return this;
   }
 
+  MigrationVersionBuilder withPreDatabaseSetupSql(String sql) {
+    _preDatabaseSetupSql = sql;
+    return this;
+  }
+
+  MigrationVersionBuilder withPostDatabaseSetupSql(String sql) {
+    _postDatabaseSetupSql = sql;
+    return this;
+  }
+
+  MigrationVersionBuilder withPreMigrationSql(String sql) {
+    _preMigrationSql = sql;
+    return this;
+  }
+
+  MigrationVersionBuilder withPostMigrationSql(String sql) {
+    _postMigrationSql = sql;
+    return this;
+  }
+
   MigrationVersion build() {
     return MigrationVersion(
       moduleName: _moduleName,
@@ -80,6 +104,10 @@ class MigrationVersionBuilder {
       databaseDefinitionProject: _databaseDefinition,
       databaseDefinitionFull: _databaseDefinitionFull,
       projectDirectory: _projectDirectory,
+      preDatabaseSetupSql: _preDatabaseSetupSql,
+      postDatabaseSetupSql: _postDatabaseSetupSql,
+      preMigrationSql: _preMigrationSql,
+      postMigrationSql: _postMigrationSql,
     );
   }
 }

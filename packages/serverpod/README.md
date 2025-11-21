@@ -24,7 +24,11 @@ Cut down on your database costs. Don't save all your data permanently when you d
 Save time. Talking with your database can be a hassle. With Serverpod's ORM, your queries use native Dart types and null-safety. There is a straight path from your statically checked code to the database.
 
 ### Database migrations
-Easily keep your database in sync as the requirements of your project evolve. Serverpod comes with a complete database migration system that helps you apply and version changes to the database. 
+Easily keep your database in sync as the requirements of your project evolve. Serverpod comes with a complete database migration system that helps you apply and version changes to the database.
+You can add optional migration hook SQL alongside each migration version. Place custom logic in
+`pre_database_setup.sql` / `post_database_setup.sql` to wrap fresh installs and use
+`pre_migration.sql` / `post_migration.sql` to surround incremental migrations. Hooks run in the
+same transaction as `definition.sql` or `migration.sql` so they are applied atomically.
 
 ### File uploads
 Upload files straight to Google Cloud Storage, S3, or store them in your database.
