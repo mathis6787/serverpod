@@ -127,5 +127,39 @@ void main() {
         contains('after migration.sql'),
       );
     });
+
+    test('writes placeholders when empty hook SQL is supplied', () async {
+      var migration = MigrationVersionBuilder()
+          .withProjectDirectory(tempDir)
+          .withVersionName('20240101000002')
+          .build();
+
+      await migration.write(
+        installedModules: migration.databaseDefinitionFull.installedModules,
+        removedModules: const [],
+        preDatabaseSetupSql: '  ',
+        postDatabaseSetupSql: '',
+        preMigrationSql: '\n',
+        postMigrationSql: '',
+      );
+
+      var preSetup = File(
+        '${tempDir.path}/migrations/20240101000002/pre_database_setup.sql',
+      );
+      var postSetup = File(
+        '${tempDir.path}/migrations/20240101000002/post_database_setup.sql',
+      );
+      var preMigration = File(
+        '${tempDir.path}/migrations/20240101000002/pre_migration.sql',
+      );
+      var postMigration = File(
+        '${tempDir.path}/migrations/20240101000002/post_migration.sql',
+      );
+
+      expect(preSetup.readAsStringSync(), contains('before definition.sql'));
+      expect(postSetup.readAsStringSync(), contains('after definition.sql'));
+      expect(preMigration.readAsStringSync(), contains('before migration.sql'));
+      expect(postMigration.readAsStringSync(), contains('after migration.sql'));
+    });
   });
 }

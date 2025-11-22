@@ -554,12 +554,13 @@ class MigrationVersion {
     String placeholder, {
     bool warnIfEmpty = false,
   }) async {
-    var content = sql ?? placeholder;
+    var hasContent = sql?.trim().isNotEmpty ?? false;
+    var content = hasContent ? sql! : placeholder;
 
     file.parent.createSync(recursive: true);
     await file.writeAsString(content);
 
-    if (warnIfEmpty && (sql?.trim().isEmpty ?? false)) {
+    if (warnIfEmpty && !hasContent && sql != null) {
       log.warning('Hook file ${file.path} is empty.');
     }
   }
@@ -584,6 +585,46 @@ class MigrationVersion {
       );
     }
     await migrationDirectory.create(recursive: true);
+
+    await _writeHookSql(
+      MigrationConstants.preDatabaseSetupSQLPath(
+        projectDirectory,
+        versionName,
+      ),
+      preDatabaseSetupSql,
+      '-- Add SQL to run before definition.sql is executed.',
+      warnIfEmpty: preDatabaseSetupSql != null,
+    );
+
+    await _writeHookSql(
+      MigrationConstants.postDatabaseSetupSQLPath(
+        projectDirectory,
+        versionName,
+      ),
+      postDatabaseSetupSql,
+      '-- Add SQL to run after definition.sql is executed.',
+      warnIfEmpty: postDatabaseSetupSql != null,
+    );
+
+    await _writeHookSql(
+      MigrationConstants.preMigrationSQLPath(
+        projectDirectory,
+        versionName,
+      ),
+      preMigrationSql,
+      '-- Add SQL to run before migration.sql is executed.',
+      warnIfEmpty: preMigrationSql != null,
+    );
+
+    await _writeHookSql(
+      MigrationConstants.postMigrationSQLPath(
+        projectDirectory,
+        versionName,
+      ),
+      postMigrationSql,
+      '-- Add SQL to run after migration.sql is executed.',
+      warnIfEmpty: postMigrationSql != null,
+    );
 
     var modulePreDatabaseHooks = moduleMigrations
         .map((m) => m.preDatabaseSetupSql)
@@ -659,26 +700,6 @@ class MigrationVersion {
     );
     await definitionSqlFile.writeAsString(definitionSql);
 
-    await _writeHookSql(
-      MigrationConstants.preDatabaseSetupSQLPath(
-        projectDirectory,
-        versionName,
-      ),
-      preDatabaseSetupSql,
-      '-- Add SQL to run before definition.sql is executed.',
-      warnIfEmpty: preDatabaseSetupSql != null,
-    );
-
-    await _writeHookSql(
-      MigrationConstants.postDatabaseSetupSQLPath(
-        projectDirectory,
-        versionName,
-      ),
-      postDatabaseSetupSql,
-      '-- Add SQL to run after definition.sql is executed.',
-      warnIfEmpty: postDatabaseSetupSql != null,
-    );
-
     // Write the migration definition JSON file
     var migrationFile = MigrationConstants.databaseMigrationJSONPath(
       projectDirectory,
@@ -697,24 +718,5 @@ class MigrationVersion {
     );
     await migrationSqlFile.writeAsString(migrationSql);
 
-    await _writeHookSql(
-      MigrationConstants.preMigrationSQLPath(
-        projectDirectory,
-        versionName,
-      ),
-      preMigrationSql,
-      '-- Add SQL to run before migration.sql is executed.',
-      warnIfEmpty: preMigrationSql != null,
-    );
-
-    await _writeHookSql(
-      MigrationConstants.postMigrationSQLPath(
-        projectDirectory,
-        versionName,
-      ),
-      postMigrationSql,
-      '-- Add SQL to run after migration.sql is executed.',
-      warnIfEmpty: postMigrationSql != null,
-    );
   }
 }
