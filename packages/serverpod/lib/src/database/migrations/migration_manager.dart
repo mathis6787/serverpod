@@ -138,28 +138,69 @@ class MigrationManager {
     var sqlToExecute = <({String version, String sql})>[];
 
     if (fromVersion == null) {
-      var definitionSqlFile = MigrationConstants.databaseDefinitionSQLPath(
-        _projectDirectory,
-        latestVersion,
+      var sql = await _assembleSql(
+        MigrationConstants.preDatabaseSetupSQLPath(
+          _projectDirectory,
+          latestVersion,
+        ),
+        MigrationConstants.databaseDefinitionSQLPath(
+          _projectDirectory,
+          latestVersion,
+        ),
+        MigrationConstants.postDatabaseSetupSQLPath(
+          _projectDirectory,
+          latestVersion,
+        ),
       );
-      var sqlDefinition = await definitionSqlFile.readAsString();
 
-      sqlToExecute.add((version: latestVersion, sql: sqlDefinition));
+      sqlToExecute.add((version: latestVersion, sql: sql));
     } else {
       var newerVersions = _getVersionsToApply(fromVersion);
 
       for (var version in newerVersions) {
-        var migrationSqlFile = MigrationConstants.databaseMigrationSQLPath(
-          _projectDirectory,
-          version,
+        var sql = await _assembleSql(
+          MigrationConstants.preMigrationSQLPath(
+            _projectDirectory,
+            version,
+          ),
+          MigrationConstants.databaseMigrationSQLPath(
+            _projectDirectory,
+            version,
+          ),
+          MigrationConstants.postMigrationSQLPath(
+            _projectDirectory,
+            version,
+          ),
         );
-        var sqlMigration = await migrationSqlFile.readAsString();
 
-        sqlToExecute.add((version: version, sql: sqlMigration));
+        sqlToExecute.add((version: version, sql: sql));
       }
     }
 
     return sqlToExecute;
+  }
+
+  Future<String> _assembleSql(
+    File pre,
+    File core,
+    File post,
+  ) async {
+    var parts = <String>[];
+
+    var preSql = await _readSqlIfExists(pre);
+    if (preSql.trim().isNotEmpty) parts.add(preSql);
+
+    parts.add(await core.readAsString());
+
+    var postSql = await _readSqlIfExists(post);
+    if (postSql.trim().isNotEmpty) parts.add(postSql);
+
+    return parts.join('\n\n');
+  }
+
+  Future<String> _readSqlIfExists(File file) async {
+    if (!file.existsSync()) return '';
+    return file.readAsString();
   }
 
   /// Migration a single module to the latest version.

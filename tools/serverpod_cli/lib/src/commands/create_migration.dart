@@ -13,7 +13,11 @@ import 'package:serverpod_shared/serverpod_shared.dart' hide ExitException;
 
 enum CreateMigrationOption<V> implements OptionDefinition<V> {
   force(CreateMigrationCommand.forceOption),
-  tag(CreateMigrationCommand.tagOption);
+  tag(CreateMigrationCommand.tagOption),
+  preDatabaseSetup(CreateMigrationCommand.preDatabaseSetupHookOption),
+  postDatabaseSetup(CreateMigrationCommand.postDatabaseSetupHookOption),
+  preMigration(CreateMigrationCommand.preMigrationHookOption),
+  postMigration(CreateMigrationCommand.postMigrationHookOption);
 
   const CreateMigrationOption(this.option);
 
@@ -39,12 +43,53 @@ class CreateMigrationCommand extends ServerpodCommand<CreateMigrationOption> {
     customValidator: _validateTag,
   );
 
+  static const preDatabaseSetupHookOption = StringOption(
+    argName: 'pre-db-setup',
+    helpText:
+        'Optional SQL file to run before the generated definition.sql content.',
+  );
+
+  static const postDatabaseSetupHookOption = StringOption(
+    argName: 'post-db-setup',
+    helpText:
+        'Optional SQL file to run after the generated definition.sql content.',
+  );
+
+  static const preMigrationHookOption = StringOption(
+    argName: 'pre-migration',
+    helpText:
+        'Optional SQL file to run before the generated migration.sql content.',
+  );
+
+  static const postMigrationHookOption = StringOption(
+    argName: 'post-migration',
+    helpText:
+        'Optional SQL file to run after the generated migration.sql content.',
+  );
+
   static void _validateTag(String tag) {
     if (!StringValidators.isValidTagName(tag)) {
       throw const FormatException(
         'Tag names can only contain lowercase letters, numbers, and dashes.',
       );
     }
+  }
+
+  static Future<String?> _readHookFile(String? path) async {
+    if (path == null) return null;
+
+    var file = File(path);
+    if (!file.existsSync()) {
+      log.error('Hook file not found: $path');
+      throw ExitException(ServerpodCommand.commandInvokedCannotExecute);
+    }
+
+    var sql = await file.readAsString();
+    if (sql.trim().isEmpty) {
+      log.warning('Hook file $path is empty.');
+    }
+
+    return sql;
   }
 
   @override
@@ -62,6 +107,18 @@ class CreateMigrationCommand extends ServerpodCommand<CreateMigrationOption> {
   ) async {
     bool force = commandConfig.value(CreateMigrationOption.force);
     String? tag = commandConfig.optionalValue(CreateMigrationOption.tag);
+    var preDatabaseSetupSql = await _readHookFile(
+      commandConfig.optionalValue(CreateMigrationOption.preDatabaseSetup),
+    );
+    var postDatabaseSetupSql = await _readHookFile(
+      commandConfig.optionalValue(CreateMigrationOption.postDatabaseSetup),
+    );
+    var preMigrationSql = await _readHookFile(
+      commandConfig.optionalValue(CreateMigrationOption.preMigration),
+    );
+    var postMigrationSql = await _readHookFile(
+      commandConfig.optionalValue(CreateMigrationOption.postMigration),
+    );
 
     GeneratorConfig config;
     try {
@@ -95,6 +152,10 @@ class CreateMigrationCommand extends ServerpodCommand<CreateMigrationOption> {
           tag: tag,
           force: force,
           config: config,
+          preDatabaseSetupSql: preDatabaseSetupSql,
+          postDatabaseSetupSql: postDatabaseSetupSql,
+          preMigrationSql: preMigrationSql,
+          postMigrationSql: postMigrationSql,
         );
       } on MigrationVersionLoadException catch (e) {
         log.error(
