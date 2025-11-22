@@ -80,5 +80,52 @@ void main() {
         reason: 'Module post migration hooks should precede app post hooks.',
       );
     });
+
+    test('creates placeholder hook files when no hook SQL is provided', () async {
+      var migration = MigrationVersionBuilder()
+          .withProjectDirectory(tempDir)
+          .withVersionName('20240101000001')
+          .build();
+
+      await migration.write(
+        installedModules: migration.databaseDefinitionFull.installedModules,
+        removedModules: const [],
+      );
+
+      var preSetup = File(
+        '${tempDir.path}/migrations/20240101000001/pre_database_setup.sql',
+      );
+      var postSetup = File(
+        '${tempDir.path}/migrations/20240101000001/post_database_setup.sql',
+      );
+      var preMigration = File(
+        '${tempDir.path}/migrations/20240101000001/pre_migration.sql',
+      );
+      var postMigration = File(
+        '${tempDir.path}/migrations/20240101000001/post_migration.sql',
+      );
+
+      expect(preSetup.existsSync(), isTrue);
+      expect(postSetup.existsSync(), isTrue);
+      expect(preMigration.existsSync(), isTrue);
+      expect(postMigration.existsSync(), isTrue);
+
+      expect(
+        preSetup.readAsStringSync(),
+        contains('before definition.sql'),
+      );
+      expect(
+        postSetup.readAsStringSync(),
+        contains('after definition.sql'),
+      );
+      expect(
+        preMigration.readAsStringSync(),
+        contains('before migration.sql'),
+      );
+      expect(
+        postMigration.readAsStringSync(),
+        contains('after migration.sql'),
+      );
+    });
   });
 }

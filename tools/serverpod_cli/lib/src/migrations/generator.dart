@@ -550,13 +550,16 @@ class MigrationVersion {
 
   Future<void> _writeHookSql(
     File file,
-    String sql, {
+    String? sql,
+    String placeholder, {
     bool warnIfEmpty = false,
   }) async {
-    file.parent.createSync(recursive: true);
-    await file.writeAsString(sql);
+    var content = sql ?? placeholder;
 
-    if (warnIfEmpty && sql.trim().isEmpty) {
+    file.parent.createSync(recursive: true);
+    await file.writeAsString(content);
+
+    if (warnIfEmpty && (sql?.trim().isEmpty ?? false)) {
       log.warning('Hook file ${file.path} is empty.');
     }
   }
@@ -661,7 +664,8 @@ class MigrationVersion {
         projectDirectory,
         versionName,
       ),
-      preDatabaseSetupSql ?? '',
+      preDatabaseSetupSql,
+      '-- Add SQL to run before definition.sql is executed.',
       warnIfEmpty: preDatabaseSetupSql != null,
     );
 
@@ -670,7 +674,8 @@ class MigrationVersion {
         projectDirectory,
         versionName,
       ),
-      postDatabaseSetupSql ?? '',
+      postDatabaseSetupSql,
+      '-- Add SQL to run after definition.sql is executed.',
       warnIfEmpty: postDatabaseSetupSql != null,
     );
 
@@ -697,7 +702,8 @@ class MigrationVersion {
         projectDirectory,
         versionName,
       ),
-      preMigrationSql ?? '',
+      preMigrationSql,
+      '-- Add SQL to run before migration.sql is executed.',
       warnIfEmpty: preMigrationSql != null,
     );
 
@@ -706,7 +712,8 @@ class MigrationVersion {
         projectDirectory,
         versionName,
       ),
-      postMigrationSql ?? '',
+      postMigrationSql,
+      '-- Add SQL to run after migration.sql is executed.',
       warnIfEmpty: postMigrationSql != null,
     );
   }
