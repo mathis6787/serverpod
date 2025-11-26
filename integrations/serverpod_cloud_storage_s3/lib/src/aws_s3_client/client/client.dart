@@ -30,23 +30,23 @@ class AwsS3Client {
   /// @param region The region of the bucket. Required.
   /// @param sessionToken The session token. Optional.
   /// @param client The http client. Optional. Useful for debugging.
-  AwsS3Client(
-      {required String secretKey,
-      required String accessKey,
-      required String bucketId,
-      String? host,
-      bool useHttps = true,
-      required String region,
-      String? sessionToken,
-      Client? client})
-      : _accessKey = accessKey,
-        _secretKey = secretKey,
-        _host = host ?? "s3.$region.amazonaws.com",
-        _bucketId = bucketId,
-        _region = region,
-        _sessionToken = sessionToken,
-        _useHttps = useHttps,
-        _client = client ?? Client();
+  AwsS3Client({
+    required String secretKey,
+    required String accessKey,
+    required String bucketId,
+    String? host,
+    bool useHttps = true,
+    required String region,
+    String? sessionToken,
+    Client? client,
+  }) : _accessKey = accessKey,
+       _secretKey = secretKey,
+       _host = host ?? "s3.$region.amazonaws.com",
+       _bucketId = bucketId,
+       _region = region,
+       _sessionToken = sessionToken,
+       _useHttps = useHttps,
+       _client = client ?? Client();
 
   Future<ListBucketResult?> listObjects({
     String? prefix,
@@ -116,18 +116,26 @@ class AwsS3Client {
       signedHeaders.write(';x-amz-security-token');
     }
 
-    final canonicalRequest = '''$method
+    final canonicalRequest =
+        '''$method
 /${unencodedPath.split('/').map(Uri.encodeComponent).join('/')}
 $canonicalQuery
 ${canonicalHeaders.toString()}
 ${signedHeaders.toString()}
 $payload''';
 
-    final stringToSign = SigV4.buildStringToSign(datetime, credentialScope,
-        SigV4.hashCanonicalRequest(canonicalRequest));
+    final stringToSign = SigV4.buildStringToSign(
+      datetime,
+      credentialScope,
+      SigV4.hashCanonicalRequest(canonicalRequest),
+    );
 
-    final signingKey =
-        SigV4.calculateSigningKey(_secretKey, datetime, _region, _service);
+    final signingKey = SigV4.calculateSigningKey(
+      _secretKey,
+      datetime,
+      _region,
+      _service,
+    );
     final signature = SigV4.calculateSignature(signingKey, stringToSign);
 
     final authorization =
