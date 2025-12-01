@@ -16,14 +16,8 @@ MigrationVersion _createMigrationVersion(
     moduleName: 'example_project',
     tables: [],
     installedModules: [
-      DatabaseMigrationVersion(
-        module: 'serverpod',
-        version: '00000000000000',
-      ),
-      DatabaseMigrationVersion(
-        module: 'example_project',
-        version: versionName,
-      ),
+      DatabaseMigrationVersion(module: 'serverpod', version: '00000000000000'),
+      DatabaseMigrationVersion(module: 'example_project', version: versionName),
     ],
     migrationApiVersion: DatabaseConstants.migrationApiVersion,
   );
@@ -77,88 +71,95 @@ void main() {
           .withVersionName(versionName)
           .build();
 
-    expect(
-      () => migrationVersion.write(
-        installedModules: [],
-        removedModules: [],
+      expect(
+        () => migrationVersion.write(
+          installedModules: [],
+          removedModules: [],
+          previousVersion: null,
+        ),
+        throwsA(isA<MigrationVersionAlreadyExistsException>()),
+      );
+    },
+  );
+
+  test(
+    'Given custom database setup SQL in previous migration when writing new migration then files are copied.',
+    () async {
+      const previousVersion = '20240101000000';
+      const currentVersion = '20240102000000';
+
+      var previousDirectory = MigrationConstants.migrationVersionDirectory(
+        tempDirectory,
+        previousVersion,
+      );
+      previousDirectory.createSync(recursive: true);
+
+      var previousPreFile = MigrationConstants.preDatabaseSetupSQLPath(
+        tempDirectory,
+        previousVersion,
+      );
+      var previousPostFile = MigrationConstants.postDatabaseSetupSQLPath(
+        tempDirectory,
+        previousVersion,
+      );
+      previousPreFile.writeAsStringSync('PRE-CUSTOM-SQL;');
+      previousPostFile.writeAsStringSync('POST-CUSTOM-SQL;');
+
+      var migrationVersion = _createMigrationVersion(
+        tempDirectory,
+        currentVersion,
+      );
+
+      await migrationVersion.write(
+        installedModules:
+            migrationVersion.databaseDefinitionFull.installedModules,
+        removedModules: const [],
+        previousVersion: previousVersion,
+      );
+
+      var newPreFile = MigrationConstants.preDatabaseSetupSQLPath(
+        tempDirectory,
+        currentVersion,
+      );
+      var newPostFile = MigrationConstants.postDatabaseSetupSQLPath(
+        tempDirectory,
+        currentVersion,
+      );
+
+      expect(newPreFile.readAsStringSync(), 'PRE-CUSTOM-SQL;');
+      expect(newPostFile.readAsStringSync(), 'POST-CUSTOM-SQL;');
+    },
+  );
+
+  test(
+    'Given no previous migration when writing migration version then database setup SQL files are empty.',
+    () async {
+      const currentVersion = '20240103000000';
+      var migrationVersion = _createMigrationVersion(
+        tempDirectory,
+        currentVersion,
+      );
+
+      await migrationVersion.write(
+        installedModules:
+            migrationVersion.databaseDefinitionFull.installedModules,
+        removedModules: const [],
         previousVersion: null,
-      ),
-      throwsA(isA<MigrationVersionAlreadyExistsException>()),
-    );
-  });
+      );
 
-  test(
-      'Given custom database setup SQL in previous migration when writing new migration then files are copied.',
-      () async {
-    const previousVersion = '20240101000000';
-    const currentVersion = '20240102000000';
+      var preFile = MigrationConstants.preDatabaseSetupSQLPath(
+        tempDirectory,
+        currentVersion,
+      );
+      var postFile = MigrationConstants.postDatabaseSetupSQLPath(
+        tempDirectory,
+        currentVersion,
+      );
 
-    var previousDirectory = MigrationConstants.migrationVersionDirectory(
-      tempDirectory,
-      previousVersion,
-    );
-    previousDirectory.createSync(recursive: true);
-
-    var previousPreFile = MigrationConstants.preDatabaseSetupSQLPath(
-      tempDirectory,
-      previousVersion,
-    );
-    var previousPostFile = MigrationConstants.postDatabaseSetupSQLPath(
-      tempDirectory,
-      previousVersion,
-    );
-    previousPreFile.writeAsStringSync('PRE-CUSTOM-SQL;');
-    previousPostFile.writeAsStringSync('POST-CUSTOM-SQL;');
-
-    var migrationVersion =
-        _createMigrationVersion(tempDirectory, currentVersion);
-
-    await migrationVersion.write(
-      installedModules:
-          migrationVersion.databaseDefinitionFull.installedModules,
-      removedModules: const [],
-      previousVersion: previousVersion,
-    );
-
-    var newPreFile = MigrationConstants.preDatabaseSetupSQLPath(
-      tempDirectory,
-      currentVersion,
-    );
-    var newPostFile = MigrationConstants.postDatabaseSetupSQLPath(
-      tempDirectory,
-      currentVersion,
-    );
-
-    expect(newPreFile.readAsStringSync(), 'PRE-CUSTOM-SQL;');
-    expect(newPostFile.readAsStringSync(), 'POST-CUSTOM-SQL;');
-  });
-
-  test(
-      'Given no previous migration when writing migration version then database setup SQL files are empty.',
-      () async {
-    const currentVersion = '20240103000000';
-    var migrationVersion =
-        _createMigrationVersion(tempDirectory, currentVersion);
-
-    await migrationVersion.write(
-      installedModules:
-          migrationVersion.databaseDefinitionFull.installedModules,
-      removedModules: const [],
-      previousVersion: null,
-    );
-
-    var preFile = MigrationConstants.preDatabaseSetupSQLPath(
-      tempDirectory,
-      currentVersion,
-    );
-    var postFile = MigrationConstants.postDatabaseSetupSQLPath(
-      tempDirectory,
-      currentVersion,
-    );
-
-    expect(preFile.existsSync(), isTrue);
-    expect(postFile.existsSync(), isTrue);
-    expect(preFile.readAsStringSync(), isEmpty);
-    expect(postFile.readAsStringSync(), isEmpty);
-  });
+      expect(preFile.existsSync(), isTrue);
+      expect(postFile.existsSync(), isTrue);
+      expect(preFile.readAsStringSync(), isEmpty);
+      expect(postFile.readAsStringSync(), isEmpty);
+    },
+  );
 }
