@@ -510,6 +510,49 @@ class StorageAccess {
     paths.map((path) => getPublicUrl(storageId: storageId, path: path)),
   );
 
+  /// Gets a pre-signed URL for a file that provides temporary authenticated access.
+  /// This works for both public and private storage and allows specifying an expiration.
+  /// Returns null if the file doesn't exist or the storage doesn't support pre-signed URLs.
+  Future<Uri?> getPresignedUrl({
+    required String storageId,
+    required String path,
+    Duration expiration = const Duration(hours: 1),
+    String method = 'GET',
+  }) async {
+    var storage = _session.server.serverpod.storage[storageId];
+    if (storage == null) {
+      throw CloudStorageException('Storage $storageId is not registered');
+    }
+
+    return await storage.getPresignedUrl(
+      session: _session,
+      path: path,
+      expiration: expiration,
+      method: method,
+    );
+  }
+
+  /// Bulk lookup of pre-signed URLs for a list of files given a list of paths in
+  /// the storage. If any given file doesn't exist or the storage doesn't support
+  /// pre-signed URLs, null is stored at the corresponding position in the output list.
+  /// Saves on server roundtrips if a large number of pre-signed URLs must be fetched,
+  /// relative to calling [getPresignedUrl] via an endpoint for each one.
+  Future<List<Uri?>> getPresignedUrls({
+    required String storageId,
+    required List<String> paths,
+    Duration expiration = const Duration(hours: 1),
+    String method = 'GET',
+  }) => Future.wait(
+    paths.map(
+      (path) => getPresignedUrl(
+        storageId: storageId,
+        path: path,
+        expiration: expiration,
+        method: method,
+      ),
+    ),
+  );
+
   /// Creates a new file upload description, that can be passed to the client's
   /// [FileUploader]. After the file has been uploaded, the
   /// [verifyDirectFileUpload] method should be called, or the file may be
