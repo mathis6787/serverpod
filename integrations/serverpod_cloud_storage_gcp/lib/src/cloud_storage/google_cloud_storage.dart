@@ -138,4 +138,16 @@ class GoogleCloudStorage extends CloudStorage {
   }) async {
     return fileExists(session: session, path: path);
   }
+
+  @override
+  Future<Uri?> getPresignedUrl({
+    required Session session,
+    required String path,
+    Duration expiration = const Duration(hours: 1),
+    String method = 'GET',
+  }) async {
+    throw UnimplementedError(
+      'Pre-signed URL generation is not yet implemented for Google Cloud Storage',
+    );
+  }
 }

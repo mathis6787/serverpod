@@ -161,4 +161,22 @@ class S3CloudStorage extends CloudStorage {
   }) async {
     return fileExists(session: session, path: path);
   }
+
+  @override
+  Future<Uri?> getPresignedUrl({
+    required Session session,
+    required String path,
+    Duration expiration = const Duration(hours: 1),
+    String method = 'GET',
+  }) async {
+    if (!await fileExists(session: session, path: path)) {
+      return null;
+    }
+
+    return _s3Client.getPresignedUrl(
+      key: path,
+      expires: expiration,
+      method: method,
+    );
+  }
 }
