@@ -78,6 +78,90 @@ class AwsS3Client {
     return _doSignedDeleteRequest(key: key);
   }
 
+  /// Generates a presigned URL for the specified object that expires after the given duration.
+  ///
+  /// The presigned URL can be used to access the object without requiring AWS credentials.
+  /// [key] is the object key in the bucket.
+  /// [expires] is the duration until the URL expires (default: 1 hour, max: 7 days).
+  /// [method] is the HTTP method for the presigned URL (default: 'GET').
+  /// [reqParams] are optional query parameters to include in the signed request.
+  Uri getPresignedUrl({
+    required String key,
+    Duration expires = const Duration(hours: 1),
+    String method = 'GET',
+    Map<String, String>? reqParams,
+  }) {
+    final expiresInSeconds = expires.inSeconds;
+    if (expiresInSeconds <= 0 || expiresInSeconds > 604800) {
+      throw ArgumentError(
+        'Expiration must be between 1 second and 7 days (604800 seconds)',
+      );
+    }
+
+    final unencodedPath = "$_bucketId/$key";
+    final datetime = SigV4.generateDatetime();
+    final credentialScope = SigV4.buildCredentialScope(
+      datetime,
+      _region,
+      _service,
+    );
+    final credential = '$_accessKey/$credentialScope';
+
+    // Build query parameters for presigned URL
+    final queryParams = {
+      'X-Amz-Algorithm': 'AWS4-HMAC-SHA256',
+      'X-Amz-Credential': credential,
+      'X-Amz-Date': datetime,
+      'X-Amz-Expires': expiresInSeconds.toString(),
+      'X-Amz-SignedHeaders': 'host',
+      if (_sessionToken != null && _sessionToken.isNotEmpty)
+        'X-Amz-Security-Token': _sessionToken,
+      if (reqParams != null) ...reqParams,
+    };
+
+    // Build canonical request for presigned URL
+    final canonicalUri =
+        '/${unencodedPath.split('/').map(Uri.encodeComponent).join('/')}';
+    final canonicalQueryString = SigV4.buildCanonicalQueryString(queryParams);
+    final canonicalHeaders = 'host:$_host\n';
+    final signedHeaders = 'host';
+
+    final canonicalRequest =
+        '''$method
+$canonicalUri
+$canonicalQueryString
+$canonicalHeaders
+$signedHeaders
+UNSIGNED-PAYLOAD''';
+
+    // Create string to sign
+    final stringToSign = SigV4.buildStringToSign(
+      datetime,
+      credentialScope,
+      SigV4.hashCanonicalRequest(canonicalRequest),
+    );
+
+    // Calculate signature
+    final signingKey = SigV4.calculateSigningKey(
+      _secretKey,
+      datetime,
+      _region,
+      _service,
+    );
+    final signature = SigV4.calculateSignature(signingKey, stringToSign);
+
+    // Add signature to query parameters
+    final finalQueryParams = {
+      ...queryParams,
+      'X-Amz-Signature': signature,
+    };
+
+    // Return final presigned URI
+    return _useHttps
+        ? Uri.https(_host, unencodedPath, finalQueryParams)
+        : Uri.http(_host, unencodedPath, finalQueryParams);
+  }
+
   String keytoPath(String key) =>
       '/$key'.split('/').map(Uri.encodeQueryComponent).join('/');
 
