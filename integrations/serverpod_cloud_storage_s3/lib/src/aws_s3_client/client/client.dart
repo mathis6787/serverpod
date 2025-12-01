@@ -62,7 +62,7 @@ class AwsS3Client {
         if (maxKeys != null) "maxKeys": maxKeys.toString(),
       },
     );
-    _checkResponseError(response);g
+    _checkResponseError(response);
     return _parseListObjectResponse(response.body);
   }
 
