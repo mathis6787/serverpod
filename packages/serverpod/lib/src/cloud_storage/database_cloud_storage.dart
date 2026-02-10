@@ -174,6 +174,18 @@ class DatabaseCloudStorage extends CloudStorage {
     return true;
   }
 
+  @override
+  Future<Uri?> getPresignedUrl({
+    required Session session,
+    required String path,
+    Duration expiration = const Duration(hours: 1),
+    String method = 'GET',
+  }) async {
+    // Database cloud storage uses the same public URL mechanism
+    // Pre-signed URLs don't apply to database storage
+    return getPublicUrl(session: session, path: path);
+  }
+
   static String _generateAuthKey() {
     const len = 16;
     const chars =

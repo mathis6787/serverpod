@@ -79,6 +79,17 @@ abstract class CloudStorage {
     required Session session,
     required String path,
   });
+
+  /// Creates a pre-signed URL that provides temporary authenticated access to a file.
+  /// This works for both public and private storage and allows specifying an expiration.
+  ///
+  /// [method] defaults to 'GET' but can be 'PUT' for upload, 'DELETE' for deletion, etc.
+  Future<Uri?> getPresignedUrl({
+    required Session session,
+    required String path,
+    Duration expiration = const Duration(hours: 1),
+    String method = 'GET',
+  });
 }
 
 /// Exception thrown by [CloudStorage].
